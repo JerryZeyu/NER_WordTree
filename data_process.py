@@ -1,11 +1,14 @@
 import os
+import codecs
 import json
+import tqdm
+import spacy
 import warnings
 import pandas as pd
 from collections import OrderedDict
 
-PATH_data= '/Users/zhangzeyu/PycharmProjects/NER_WordTree/expl-tablestore-export-2019-09-10-165215'
-PATH_OUTPUT = '/Users/zhangzeyu/PycharmProjects/NER_WordTree/output'
+PATH_data= '/home/zeyuzhang/PycharmProjects/NER_WordTree/expl-tablestore-export-2019-09-10-165215'
+PATH_OUTPUT = '/home/zeyuzhang/PycharmProjects/NER_WordTree/output'
 
 def divide_questionAndanswer(question_answer):
     qa_dict = {}
@@ -46,19 +49,19 @@ def divide_questionAndanswer(question_answer):
         qa_dict['E'] = question_answer.split('(E)')[1].strip()
     return qa_dict
 
-def save_question_file(output_path, data_type, question_data):
-    with open(os.path.join(output_path, 'questions_{}.json'.format(data_type)),'w+') as file:
-        json.dump(question_data, file)
-        print('{} set questions has been completed !'.format(data_type))
+def save_question_file(output_path, data_type, question_data, set_type):
+    with open(os.path.join(output_path, 'questions_{}_{}.json'.format(data_type, set_type)),'w+') as file:
+        json.dump(question_data, file, ensure_ascii=False)
+        print('{} {} set questions has been completed !'.format(data_type, set_type))
 
-def save_table_file(output_path, table_data):
-    with open(os.path.join(output_path, 'table_data.json'),'w+') as file:
-        json.dump(table_data, file)
-        print('table data  has been completed !')
+def save_table_file(output_path, table_data, set_type):
+    with open(os.path.join(output_path, 'table_data_{}.json'.format(set_type)),'w+') as file:
+        json.dump(table_data, file, ensure_ascii=False)
+        print('{} table data has been completed !'.format(set_type))
 
 def question_process(data_path, data_type):
 
-    question_data_map = {}
+    question_data_map = OrderedDict()
     question_file = os.path.join(data_path, 'questions.tsv.{}.tsv'.format(data_type))
     df_q = pd.read_csv(question_file, sep='\t')
     #df_q_fileter = df_q[df_q['flags'].str.contains('SUCCESS', na=False)].copy()
@@ -69,7 +72,9 @@ def question_process(data_path, data_type):
         if 'SUCCESS' not in str(row['flags']).split(' '):
             continue
         qa_dict = divide_questionAndanswer(row['question'])
-        question_ac = [qa_dict['question'].replace("''", '" ').replace("``", '" '), qa_dict[row['AnswerKey']].replace("''", '" ').replace("``", '" ')]
+        question_ac = OrderedDict()
+        question_ac['question'] = qa_dict['question'].replace("''", '" ').replace("``", '" ')
+        question_ac['answer'] = qa_dict[row['AnswerKey']].replace("''", '" ').replace("``", '" ')
         question_data_map[row['QuestionID']] = question_ac
     print('{} set totally has {} questions'.format(data_type, len(question_data_map)))
     return question_data_map
@@ -155,8 +160,8 @@ def tablestore_process(data_dir):
             explanations_DEP += read_tsv_DEP(os.path.join(path, file))
     if not explanations:
         warnings.warn('Empty explanations')
-    dict_explanations = {}
-    dict_explanations_DEP = {}
+    dict_explanations = OrderedDict()
+    dict_explanations_DEP = OrderedDict()
     for item in explanations:
         dict_explanations[item[0]] = item[1]
     for item__ in explanations_DEP:
@@ -165,14 +170,50 @@ def tablestore_process(data_dir):
     print('tablestore totally has {} sentences'.format(len(filtered_dict_explanations)))
     return filtered_dict_explanations
 
+def get_sentences_and_tokens_from_spacy(plain_text, spacy_nlp):
+    sentences = []
+    document = spacy_nlp(plain_text)
+    for span in document.sents:
+        sentence=[document[i] for i in range(span.start, span.end)]
+        sentence_tokens = []
+        for token in sentence:
+            token_dict = OrderedDict()
+            token_dict['text'] = str(token)
+            token_dict['pos'] = token.pos_
+            if token_dict['text'].strip() in ['\n', '\t', ' ', '']:
+                continue
+            if token_dict == {}:
+                print('toekn: ', token)
+            sentence_tokens.append(token_dict)
+        sentences.append(sentence_tokens)
+    return sentences
+
+def plain2conll(plain_data, spacy_nlp, set_type):
+    conll_data = OrderedDict()
+    if set_type == 'question':
+        for item in plain_data.keys():
+            single_conll_data = OrderedDict()
+            single_conll_data['question'] = get_sentences_and_tokens_from_spacy(plain_data[item]['question'], spacy_nlp)
+            single_conll_data['answer'] = get_sentences_and_tokens_from_spacy(plain_data[item]['answer'], spacy_nlp)
+            conll_data[item] = single_conll_data
+    else:
+        for item in plain_data.keys():
+            conll_data[item] = get_sentences_and_tokens_from_spacy(plain_data[item], spacy_nlp)
+    return conll_data
 def main():
+    spacy_nlp = spacy.load('en_core_web_sm', disable=["parser", "ner", "entity_linker", "textcat", "entity_ruler"])
+    spacy_nlp.add_pipe(spacy_nlp.create_pipe('sentencizer'))
     if not os.path.exists(PATH_OUTPUT):
         os.makedirs(PATH_OUTPUT)
-    for data_type in ['train', 'dev', 'test']:
+    for data_type in ['dev', 'test', 'train']:
         question_data = question_process(PATH_data, data_type)
-        save_question_file(PATH_OUTPUT, data_type, question_data)
+        save_question_file(PATH_OUTPUT, data_type, question_data,'plain')
+        question_data_conll = plain2conll(question_data, spacy_nlp, 'question')
+        save_question_file(PATH_OUTPUT, data_type, question_data_conll, 'conll')
     table_data = tablestore_process(PATH_data)
-    save_table_file(PATH_OUTPUT, table_data)
+    save_table_file(PATH_OUTPUT, table_data, 'plain')
+    table_data_conll = plain2conll(table_data,spacy_nlp, 'tablestore')
+    save_table_file(PATH_OUTPUT, table_data_conll, 'conll')
 
 if __name__ == '__main__':
     main()
