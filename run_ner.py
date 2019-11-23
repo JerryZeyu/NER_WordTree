@@ -565,7 +565,7 @@ def main():
             model = Ner.from_pretrained(checkpoint)
             model.to(device)
             model.eval()
-            for set_type in ['train', 'dev', 'test']:
+            for set_type in ['test']:
                 eval_examples = processor.get_wordtree_question_examples(args.data_dir, set_type)
                 eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer)
                 logger.info("***** Running evaluation *****")

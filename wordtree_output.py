@@ -55,7 +55,7 @@ def token_predition_write(conll_file, y_pred, set_type):
         final_data = create_questions(conll_file, y_pred)
     else:
         final_data = create_tablestore(conll_file, y_pred)
-    with open(conll_file.split('.')[0]+'_ner.json', 'w') as file:
+    with open('_'.join(conll_file.split('_')[0:-1])+'_ner.json', 'w') as file:
         json.dump(final_data, file)
 
     print('load {} prediction results into json format files completely'.format(os.path.splitext(os.path.basename(conll_file))[0]))
