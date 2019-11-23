@@ -221,7 +221,7 @@ def main():
     if not os.path.exists(PATH_OUTPUT):
         os.makedirs(PATH_OUTPUT)
     # chunk_latest_questions(PATH_data)
-    for data_type in ['dev', 'test', 'train']:
+    for data_type in ['test']:
         question_data = question_process(PATH_data, data_type)
         save_question_file(PATH_OUTPUT, data_type, question_data,'plain')
         question_data_conll = plain2conll(question_data, spacy_nlp, 'question')
