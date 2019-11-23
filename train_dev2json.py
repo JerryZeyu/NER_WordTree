@@ -129,6 +129,7 @@ def brat_to_conll(input_folder, output_filepath, questionid_list,  tokenizer, la
             if (len(line_sentences) == 0):
                 print ("Error loading annotation -- skipping this question. ")
                 numSkippedQuestions += 1
+                print(base_filename)
                 idSkippedQuestions.append(base_filename)
                 continue
         single_conll_ner = OrderedDict()
@@ -173,7 +174,14 @@ def brat_to_conll(input_folder, output_filepath, questionid_list,  tokenizer, la
         #     print("numProcessed:" + str(numProcessed) + "\t Warnings: " + str(numWarnings))
     final_data = OrderedDict()
     for qid in questionid_list:
-        final_data[qid] = conll_ner_dict[qid]
+        if 'ENUM' in qid:
+            qid_temp = '_'.join(qid.split('_')[0:-1])
+            final_data[qid] = conll_ner_dict[qid_temp]
+        else:
+            if qid not in conll_ner_dict.keys():
+                continue
+            else:
+                final_data[qid] = conll_ner_dict[qid]
     print('json length: ', len(final_data))
     with open(output_filepath, 'w') as file_:
         json.dump(final_data, file_)
