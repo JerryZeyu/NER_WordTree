@@ -7,7 +7,7 @@ import warnings
 import pandas as pd
 from collections import OrderedDict
 
-PATH_data= '/home/zeyuzhang/PycharmProjects/NER_WordTree/expl-tablestore-export-2019-09-10-165215'
+PATH_data= '/home/zeyuzhang/expl-tablestore-export-2019-11-22-173702'
 PATH_OUTPUT = '/home/zeyuzhang/PycharmProjects/NER_WordTree/output'
 
 def divide_questionAndanswer(question_answer):
@@ -200,11 +200,27 @@ def plain2conll(plain_data, spacy_nlp, set_type):
         for item in plain_data.keys():
             conll_data[item] = get_sentences_and_tokens_from_spacy(plain_data[item], spacy_nlp)
     return conll_data
+def chunk_latest_questions(data_path):
+    df_q = pd.read_csv(os.path.join(data_path, 'questions.tsv'), sep='\t')
+    df_q = df_q.rename(columns={',,QuestionID':'QuestionID'})
+    df_q_train = df_q[df_q['category']=='Train'].copy()
+    df_q_dev = df_q[df_q['category']=='Dev'].copy()
+    df_q_test = df_q[df_q['category'] == 'Test'].copy()
+    df_q_train_filter = df_q_train[df_q_train['flags'].str.contains('SUCCESS', na=False)]
+    df_q_dev_filter = df_q_dev[df_q_dev['flags'].str.contains('SUCCESS', na=False)]
+    df_q_test_filter = df_q_test[df_q_test['flags'].str.contains('SUCCESS', na=False)]
+    print(len(df_q_train_filter))
+    print(len(df_q_dev_filter))
+    print(len(df_q_test_filter))
+    df_q_train_filter.to_csv(os.path.join(data_path, 'questions.tsv.train.tsv'), sep='\t')
+    df_q_dev_filter.to_csv(os.path.join(data_path, 'questions.tsv.dev.tsv'), sep='\t')
+    df_q_test_filter.to_csv(os.path.join(data_path, 'questions.tsv.test.tsv'), sep='\t')
 def main():
     spacy_nlp = spacy.load('en_core_web_sm', disable=["parser", "ner", "entity_linker", "textcat", "entity_ruler"])
     spacy_nlp.add_pipe(spacy_nlp.create_pipe('sentencizer'))
     if not os.path.exists(PATH_OUTPUT):
         os.makedirs(PATH_OUTPUT)
+    chunk_latest_questions(PATH_data)
     for data_type in ['dev', 'test', 'train']:
         question_data = question_process(PATH_data, data_type)
         save_question_file(PATH_OUTPUT, data_type, question_data,'plain')
