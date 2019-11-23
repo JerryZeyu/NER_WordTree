@@ -220,7 +220,7 @@ def main():
     spacy_nlp.add_pipe(spacy_nlp.create_pipe('sentencizer'))
     if not os.path.exists(PATH_OUTPUT):
         os.makedirs(PATH_OUTPUT)
-    chunk_latest_questions(PATH_data)
+    # chunk_latest_questions(PATH_data)
     for data_type in ['dev', 'test', 'train']:
         question_data = question_process(PATH_data, data_type)
         save_question_file(PATH_OUTPUT, data_type, question_data,'plain')
